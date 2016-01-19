@@ -16,55 +16,131 @@ public class UdpFileServer
         public string FILETYPE = "";
         public long FILESIZE = 0;
     }
-
+    
     private static FileDetails fileDet = new FileDetails();
 
     // Поля, связанные с UdpClient
-    private static IPAddress remoteIPAddress;
+    private static IPAddress remoteIPAddress = IPAddress.Parse("127.0.0.1");
     private const int remotePort = 5002;
     private static UdpClient sender = new UdpClient();
     private static IPEndPoint endPoint;
+    #region Поля для чата
+    private static int localPort=5001;
+    #endregion
 
     // Filestream object
     private static FileStream fs;
     [STAThread]
     static void Main(string[] args)
     {
+        Console.WriteLine("Сервер:");
+        Chat();
+    }
+
+    public static void Chat()
+    {
+        try
+        {
+            // Создаем поток для прослушивания
+            Thread tRec = new Thread(new ThreadStart(Receiver));
+            tRec.Start();
+            while (true)
+            {
+                SendMes(Console.ReadLine());
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Возникло исключение: " + ex.ToString() + "\n  " + ex.Message);
+        }
+
+    }
+
+    public static void Receiver()
+    {
+        // Создаем UdpClient для чтения входящих данных
+        UdpClient receivingUdpClient = new UdpClient(localPort);
+
+        IPEndPoint RemoteIpEndPoint = null;
+
+        try
+        {
+            Console.WriteLine(
+               "\n-----------*******Общий чат*******-----------");
+
+            while (true)
+            {
+
+                // Ожидание дейтаграммы
+                byte[] receiveBytes = receivingUdpClient.Receive(
+                   ref RemoteIpEndPoint);
+                    // Преобразуем и отображаем данные
+                    string returnData = Encoding.UTF8.GetString(receiveBytes);
+                     Console.WriteLine(" --> " + returnData.ToString());
+
+                }
+            }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Возникло исключение: " + ex.ToString() + "\n  " + ex.Message);
+        }
+    }
+
+    private static void SendMes(string datagram)
+    {
+        if (datagram=="File")
+        {
+            SendFile();
+        }
+        else
+        {
+            // Создаем UdpClient
+            UdpClient sender = new UdpClient();
+
+            // Создаем endPoint по информации об удаленном хосте
+            IPEndPoint endPoint = new IPEndPoint(remoteIPAddress, remotePort);
+
+            try
+            {
+                // Преобразуем данные в массив байтов
+                byte[] bytes = Encoding.UTF8.GetBytes(datagram);
+
+                // Отправляем данные
+                sender.Send(bytes, bytes.Length, endPoint);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Возникло исключение: " + ex.ToString() + "\n  " + ex.Message);
+            }
+            finally
+            {
+                // Закрыть соединение
+                sender.Close();
+            }
+        }
+    }
+
+    public static void SendFile()
+    {
         try
         {
             // Получаем удаленный IP-адрес и создаем IPEndPoint
-           // Console.WriteLine("Введите удаленный IP-адрес");
-           // remoteIPAddress = IPAddress.Parse(Console.ReadLine().ToString());//"127.0.0.1");
-            remoteIPAddress = IPAddress.Parse("127.0.0.1");
+            // Console.WriteLine("Введите удаленный IP-адрес");
+            // remoteIPAddress = IPAddress.Parse(Console.ReadLine().ToString());//"127.0.0.1");
             endPoint = new IPEndPoint(remoteIPAddress, remotePort);
 
             // Получаем путь файла и его размер (должен быть меньше 8kb)
             Console.WriteLine("Введите путь к файлу и его имя");
             fs = new FileStream(@Console.ReadLine().ToString(), FileMode.Open, FileAccess.Read);
-            
-            
+            SendText("File:");
             if (fs.Length > 8192)
             {
-                Console.WriteLine("Файл больше 8кБ");
-                SendText("Info");
-                SendFileInfo();
-                Thread.Sleep(2000);
-                SendText("Big," + (fs.Length / 8100+1));
                 SendBigFile();
-                fs.Close();
-                return;
             }
             else
-            SendText("Small");
-            
-            // Отправляем информацию о файле
-            SendFileInfo();
-
-            // Ждем 2 секунды
-            Thread.Sleep(2000);
-
-            // Отправляем сам файл
-            SendFile();
+            {
+                SendSmallFile();
+            }
 
             Console.ReadLine();
 
@@ -74,6 +150,7 @@ public class UdpFileServer
             Console.WriteLine(eR.ToString());
         }
     }
+
     public static void SendFileInfo()
     {
 
@@ -103,11 +180,20 @@ public class UdpFileServer
     }
     private static void SendBigFile()
     {
+        Console.WriteLine("Файл больше 8кБ");
+        SendText("Info");
+        SendFileInfo();
+        Thread.Sleep(2000);
+        SendText("Big," + (fs.Length / 8100 + 1));
+
         Byte[] bytes = new Byte[fs.Length];
         fs.Read(bytes, 0, bytes.Length);
         int numBytesToRead = 8190;
         int n = 0;
         long del = fs.Length / numBytesToRead;
+
+        
+
         for (int i = 0; i <= del; i++)
         {
             if (i == del) { numBytesToRead = Convert.ToInt32(fs.Length - numBytesToRead * del); }
@@ -121,9 +207,18 @@ public class UdpFileServer
             SendFile2(bytes_min);
             Thread.Sleep(500);
         }
+        fs.Close();
     }
-    private static void SendFile()
+    private static void SendSmallFile()
     {
+        SendText("Small");
+
+        // Отправляем информацию о файле
+        SendFileInfo();
+
+        // Ждем 2 секунды
+        Thread.Sleep(2000);
+
         // Создаем файловый поток и переводим его в байты
         Byte[] bytes = new Byte[fs.Length];
         fs.Read(bytes, 0, bytes.Length);
