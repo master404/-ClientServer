@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml.Serialization;
 using System.Diagnostics;
 using System.Threading;
@@ -76,7 +77,18 @@ public class UdpFileServer
                    ref RemoteIpEndPoint);
                     // Преобразуем и отображаем данные
                     string returnData = Encoding.UTF8.GetString(receiveBytes);
-                     Console.WriteLine(" --> " + returnData.ToString());
+                    Console.WriteLine(" --> " + returnData.ToString());
+                    if (returnData.ToString().Length >= 4)
+                    {
+                        if (returnData.ToString().Substring(0, 4) == "**ip")
+                        {
+                            Console.WriteLine("Connecting...");
+                            String[] elements = Regex.Split(returnData.ToString(), " ");
+                            remoteIPAddress = IPAddress.Parse(elements[1]);
+                            Console.WriteLine("OK");
+                            returnData = "";
+                        }
+                    }
 
                 }
             }
@@ -178,13 +190,14 @@ public class UdpFileServer
         stream.Close();
 
     }
+   
     private static void SendBigFile()
     {
         Console.WriteLine("Файл больше 8кБ");
         SendText("Info");
         SendFileInfo();
         Thread.Sleep(2000);
-        SendText("Big," + (fs.Length / 8100 + 1));
+        SendText("Big," + (fs.Length / 8190 + 1));
 
         Byte[] bytes = new Byte[fs.Length];
         fs.Read(bytes, 0, bytes.Length);
@@ -193,7 +206,6 @@ public class UdpFileServer
         long del = fs.Length / numBytesToRead;
 
         
-
         for (int i = 0; i <= del; i++)
         {
             if (i == del) { numBytesToRead = Convert.ToInt32(fs.Length - numBytesToRead * del); }
@@ -208,7 +220,10 @@ public class UdpFileServer
             Thread.Sleep(500);
         }
         fs.Close();
+        SendText("End");
+        Console.WriteLine("--------------------------");
     }
+   
     private static void SendSmallFile()
     {
         SendText("Small");

@@ -30,11 +30,16 @@ public class UdpFileClient
     private static Byte[] receiveBytes = new Byte[0];
     private static string returnData="";
 
-    private static IPAddress remoteIPAddress = IPAddress.Parse("127.0.0.1");
+    private static IPAddress remoteIPAddress = IPAddress.Parse("192.168.0.12");
     private const int remotePort = 5001;
+
+    static System.Net.IPAddress ip;
     [STAThread]
     static void Main(string[] args)
     {
+        String host = System.Net.Dns.GetHostName();
+        ip = System.Net.Dns.GetHostByName(host).AddressList[0];
+        SendMes("**ip "+ ip+ " online");
         Console.WriteLine("Клиент:");
         Chat();
     }
@@ -139,6 +144,7 @@ public class UdpFileClient
             Console.WriteLine(eR.ToString());
         }
     }
+
     public static void ReceiveFile()
     {
         try
@@ -171,29 +177,6 @@ public class UdpFileClient
             fs.Close();
             receivingUdpClient.Close();
             Console.Read();
-        }
-    }
-
-    public static void ReceiveFile2(byte[] receiveBytes)
-    {
-        try
-        {
-            Console.WriteLine("-----------*******Ожидайте получение файла*******-----------");
-
-            Console.WriteLine("----Получено " + receiveBytes.Length + " Байт...Сохраняем...");
-
-            Console.WriteLine("----Сохранено...");
-
-        }
-        catch (Exception eR)
-        {
-            Console.WriteLine(eR.ToString());
-        }
-        finally
-        {
-            //fs.Close();
-            //receivingUdpClient.Close();
-            //Console.Read();
         }
     }
 
@@ -231,53 +214,10 @@ public class UdpFileClient
             Console.Read();
         }
     }
-    static Byte[] bytesm= new Byte[0];
+    static Byte[] bytesm;
     static bool File=false,Big = false;
     static int nak=0;
 
-    public static void TakeFile(string returnData)
-    {
-        if (returnData.ToString() == "Small")
-        {
-            GetFileDetails();
-            ReceiveFile();
-            returnData = "";
-            File = false;
-        }
-        else if (returnData.ToString().Substring(0, 4) == "Info")
-        { GetFileDetails(); }
-        else if (returnData.ToString().Substring(0, 3) == "Big")
-        {
-            if (Big == false)
-            {
-                String[] elements = Regex.Split(returnData.ToString(), ",");
-                Console.WriteLine(" --> " + elements[0] + " " + elements[1]);
-                nak = Convert.ToInt32(elements[1]);
-                Big = true;
-                returnData = "";
-            }
-        }
-        else if (Big == true)
-        {
-            bytesm = bytesm.Concat(receiveBytes).ToArray();
-            ReceiveFile2(receiveBytes);
-            nak = nak - 1;
-            Console.WriteLine(" --> " + nak);
-            if (nak <= 0)
-            {
-                Console.WriteLine(" ---End--- ");
-                Console.WriteLine("L="+bytesm.Length);
-                Big = false;
-                fs = new FileStream("temp." + fileDet.FILETYPE, FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite);
-                fs.Write(bytesm, 0, bytesm.Length);
-                Process.Start(fs.Name);
-                File = false;
-            }
-            //returnData = "";
-            //Console.WriteLine(" --> " + returnData.ToString());
-        }
-
-    }
     public static void ReceiverText()
     {
         // Создаем UdpClient для чтения входящих данных
@@ -297,7 +237,7 @@ public class UdpFileClient
                 returnData = Encoding.UTF8.GetString(receiveBytes);
                 if (returnData.ToString() == "File:" || File == true)
                 {
-                    #region Если это файл
+                    #region Если это файл...
                     File = true;
                     if (returnData.ToString() == "Small")
                     {
@@ -306,26 +246,25 @@ public class UdpFileClient
                         returnData = "";
                         File = false;
                     }
-                    else if (returnData.ToString().Substring(0, 4) == "Info")
+                    else if (returnData.ToString().Length >= 4 && returnData.ToString().Substring(0, 4) == "Info")
                     { GetFileDetails(); }
-                    else if (returnData.ToString().Substring(0, 3) == "Big")
+                    else if (returnData.ToString().Length >= 3 && returnData.ToString().Substring(0, 3) == "Big")
                     {
                         if (Big == false)
                         {
+                            Console.WriteLine("-----------*******Ожидайте получение файла*******-----------");
                             String[] elements = Regex.Split(returnData.ToString(), ",");
                             Console.WriteLine(" --> " + elements[0] + " " + elements[1]);
                             nak = Convert.ToInt32(elements[1]);
                             Big = true;
                             returnData = "";
+                            bytesm = new Byte[0];
                         }
                     }
                     else if (Big == true)
                     {
-                        bytesm = bytesm.Concat(receiveBytes).ToArray();
-                        ReceiveFile2(receiveBytes);
-                        nak = nak - 1;
-                        Console.WriteLine(" --> " + nak);
-                        if (nak <= 0)
+                        
+                        if (returnData.ToString() == "End")
                         {
                             Console.WriteLine(" ---End--- ");
                             Console.WriteLine("L=" + bytesm.Length);
@@ -334,7 +273,28 @@ public class UdpFileClient
                             fs.Write(bytesm, 0, bytesm.Length);
                             Process.Start(fs.Name);
                             File = false;
+                            SendMes("Ip: "+ip+" Got File");
                         }
+                        else
+                        {
+                            bytesm = bytesm.Concat(receiveBytes).ToArray();
+                            Console.WriteLine("----Получено " + receiveBytes.Length + " Байт");
+                            nak = nak - 1;
+                            Console.WriteLine(" --> " + nak);
+                        }
+                        /*
+                        if (nak <= 0)
+                        {
+                         //   Console.WriteLine(" ---End--- ");
+                         //   Console.WriteLine("L=" + bytesm.Length);
+                         //   Big = false;
+                            fs = new FileStream("temp." + fileDet.FILETYPE, FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite);
+                            fs.Write(bytesm, 0, bytesm.Length);
+                            Process.Start(fs.Name);
+                        //    File = false;
+                        }
+                         * */
+                         
                     }
                     # endregion
                 }
